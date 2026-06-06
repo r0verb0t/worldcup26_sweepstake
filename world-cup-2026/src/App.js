@@ -1,71 +1,94 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-export default function WorldCup2026Predictions() {
-  const [tab, setTab] = useState('leaderboard');
+export default function WorldCup2026Sweepstake() {
+  const [tab, setTab] = useState('standings');
   const [matches, setMatches] = useState([]);
-  const [teams, setTeams] = useState([]);
   const [predictions, setPredictions] = useState({});
   const [allPredictions, setAllPredictions] = useState([]);
-  const [groupFilter, setGroupFilter] = useState('all');
-  const [showAddTeam, setShowAddTeam] = useState(false);
   const [showPredictionForm, setShowPredictionForm] = useState(null);
   const [playerName, setPlayerName] = useState(localStorage.getItem('playerName') || '');
-  const [lastSync, setLastSync] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [newTeamForm, setNewTeamForm] = useState({ team: '', colleague: '', flag: '', group: '' });
   const [shareLink, setShareLink] = useState('');
-  const [dataMode, setDataMode] = useState('manual');
   
-  // Replace with your actual Google Apps Script URL
+  // Google Apps Script URL for predictions
   const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxjbxhbOqHVm8il5AnQ7txGBxnz8YkowQ8_2C-zaLeF3KV4oWnXT1pr0cPPoqojPE1a/exec";
+  
+  // World Cup 2026 API - Free, no key required
+  const WC_API_URL = "https://worldcup26.ir/api";
 
-  const wcTeams = [
-    { name: 'Argentina', flag: '🇦🇷', group: 'A' },
-    { name: 'Canada', flag: '🇨🇦', group: 'A' },
-    { name: 'Japan', flag: '🇯🇵', group: 'A' },
-    { name: 'Morocco', flag: '🇲🇦', group: 'A' },
-    { name: 'Denmark', flag: '🇩🇰', group: 'B' },
-    { name: 'Ecuador', flag: '🇪🇨', group: 'B' },
-    { name: 'England', flag: '🇬🇧', group: 'B' },
-    { name: 'Slovenia', flag: '🇸🇮', group: 'B' },
-    { name: 'Netherlands', flag: '🇳🇱', group: 'C' },
-    { name: 'Senegal', flag: '🇸🇳', group: 'C' },
-    { name: 'France', flag: '🇫🇷', group: 'C' },
-    { name: 'New Zealand', flag: '🇳🇿', group: 'C' },
-    { name: 'Brazil', flag: '🇧🇷', group: 'D' },
-    { name: 'Germany', flag: '🇩🇪', group: 'D' },
-    { name: 'Spain', flag: '🇪🇸', group: 'D' },
-    { name: 'Costa Rica', flag: '🇨🇷', group: 'D' },
-    { name: 'Belgium', flag: '🇧🇪', group: 'E' },
-    { name: 'Slovakia', flag: '🇸🇰', group: 'E' },
-    { name: 'Romania', flag: '🇷🇴', group: 'E' },
-    { name: 'Serbia', flag: '🇷🇸', group: 'E' },
-    { name: 'Italy', flag: '🇮🇹', group: 'F' },
-    { name: 'Switzerland', flag: '🇨🇭', group: 'F' },
-    { name: 'Kazakhstan', flag: '🇰🇿', group: 'F' },
-    { name: 'Bulgaria', flag: '🇧🇬', group: 'F' },
-    { name: 'Mexico', flag: '🇲🇽', group: 'G' },
-    { name: 'Portugal', flag: '🇵🇹', group: 'G' },
-    { name: 'Poland', flag: '🇵🇱', group: 'G' },
-    { name: 'Uruguay', flag: '🇺🇾', group: 'G' },
-    { name: 'Australia', flag: '🇦🇺', group: 'H' },
-    { name: 'USA', flag: '🇺🇸', group: 'H' },
-    { name: 'Wales', flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿', group: 'H' },
-    { name: 'Turkey', flag: '🇹🇷', group: 'H' },
+  // Professional color palette
+  const colors = {
+    primary: '#0052CC',      // Bold Blue
+    success: '#2E7D32',      // Average Green
+    danger: '#E53935',       // Torch Red
+    warning: '#FFC107',      // Golden Yellow
+    background: '#F8F9FA',
+    surface: '#FFFFFF',
+    border: '#E0E0E0',
+    text: '#212121',
+    textSecondary: '#757575',
+    primaryLight: '#E8EFFE',
+    successLight: '#E8F5E9',
+    dangerLight: '#FFEBEE',
+    warningLight: '#FFF8E1'
+  };
+
+  // Hard-coded teams and colleagues
+  const hardcodedTeams = [
+    { id: 1, team: 'Argentina', colleague: 'John Smith', flag: '🇦🇷', group: 'A' },
+    { id: 2, team: 'Brazil', colleague: 'Sarah Johnson', flag: '🇧🇷', group: 'D' },
+    { id: 3, team: 'France', colleague: 'Michael Chen', flag: '🇫🇷', group: 'C' },
+    { id: 4, team: 'England', colleague: 'Emma Wilson', flag: '🇬🇧', group: 'B' },
+    { id: 5, team: 'Germany', colleague: 'David Martinez', flag: '🇩🇪', group: 'D' },
+    { id: 6, team: 'Spain', colleague: 'Lisa Anderson', flag: '🇪🇸', group: 'D' },
   ];
 
   // Load from localStorage
   useEffect(() => {
     const savedMatches = JSON.parse(localStorage.getItem('wc2026_matches') || '[]');
-    const savedTeams = JSON.parse(localStorage.getItem('wc2026_teams') || '[]');
     const savedPredictions = JSON.parse(localStorage.getItem('wc2026_predictions') || '{}');
     const savedPlayerName = localStorage.getItem('playerName') || '';
 
     setMatches(savedMatches);
-    setTeams(savedTeams);
     setPredictions(savedPredictions);
     setPlayerName(savedPlayerName);
+    
+    // Fetch latest matches from World Cup API
+    fetchWorldCupMatches();
+  }, []);
+
+  // Fetch World Cup matches from API
+  const fetchWorldCupMatches = async () => {
+    try {
+      const response = await fetch(`${WC_API_URL}/matches`);
+      const data = await response.json();
+      
+      if (data && Array.isArray(data)) {
+        // Map API data to our format
+        const formattedMatches = data.map((match, idx) => ({
+          id: match.id || idx,
+          team1: match.home_team || 'TBD',
+          team2: match.away_team || 'TBD',
+          date: match.kickoff_utc || new Date().toISOString(),
+          group: match.group_name || 'Group',
+          score1: match.home_team_score !== null ? match.home_team_score : undefined,
+          score2: match.away_team_score !== null ? match.away_team_score : undefined,
+          status: match.status || 'scheduled'
+        }));
+        
+        setMatches(formattedMatches);
+        localStorage.setItem('wc2026_matches', JSON.stringify(formattedMatches));
+      }
+    } catch (error) {
+      console.error('Error fetching World Cup matches:', error);
+      // Use existing matches if API fails
+    }
+  };
+
+  // Refresh matches every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchWorldCupMatches, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Save to localStorage
@@ -83,12 +106,12 @@ export default function WorldCup2026Predictions() {
 
   // Generate shareable link
   useEffect(() => {
-    if (teams.length > 0) {
-      const encodedData = btoa(JSON.stringify({ teams, matches, predictions }));
+    if (hardcodedTeams.length > 0) {
+      const encodedData = btoa(JSON.stringify({ teams: hardcodedTeams, matches, predictions }));
       const link = `${window.location.href}#data=${encodedData}`;
       setShareLink(link);
     }
-  }, [teams, matches]);
+  }, [matches]);
 
   // Check if match has started
   const hasMatchStarted = (matchDate) => {
@@ -131,7 +154,7 @@ export default function WorldCup2026Predictions() {
       // Update local predictions
       setPredictions({ ...predictions, [matchId]: prediction });
 
-      // Add to all predictions list for leaderboard
+      // Add to all predictions list
       setAllPredictions([...allPredictions, {
         playerName: playerName,
         matchId: matchId,
@@ -148,370 +171,212 @@ export default function WorldCup2026Predictions() {
     }
   };
 
-  const syncLiveData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('https://api.api-football.com/v3/fixtures?league=1&season=2026&limit=100');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.response && data.response.length > 0) {
-          const newMatches = data.response.map(fixture => ({
-            id: fixture.fixture.id,
-            team1: fixture.teams.home.name,
-            team2: fixture.teams.away.name,
-            score1: fixture.goals.home,
-            score2: fixture.goals.away,
-            date: fixture.fixture.date,
-            status: fixture.fixture.status.short === 'FT' ? 'completed' : 'upcoming',
-            group: fixture.league.round ? fixture.league.round.split(' ')[0] : 'unknown'
-          }));
-          setMatches(newMatches);
-          setDataMode('live');
-          setLastSync(new Date().toLocaleTimeString());
-        }
-      }
-    } catch (err) {
-      console.log('Live sync unavailable');
-    }
-    setLoading(false);
-  };
-
-  const addTeam = () => {
-    if (newTeamForm.team && newTeamForm.colleague) {
-      const teamData = wcTeams.find(t => t.name === newTeamForm.team);
-      setTeams([...teams, {
-        ...newTeamForm,
-        flag: teamData?.flag || newTeamForm.flag,
-        group: teamData?.group || '',
-        id: Date.now()
-      }]);
-      setNewTeamForm({ team: '', colleague: '', flag: '', group: '' });
-      setShowAddTeam(false);
-    }
-  };
-
-  const updateMatchScore = (id, score1, score2) => {
-    setMatches(matches.map(m =>
-      m.id === id
-        ? { ...m, score1: score1 !== '' ? parseInt(score1) : null, score2: score2 !== '' ? parseInt(score2) : null, status: score1 !== '' && score2 !== '' ? 'completed' : 'upcoming' }
-        : m
-    ));
+  const updateMatchScore = (matchId, score1, score2) => {
+    const updatedMatches = matches.map(m =>
+      m.id === matchId ? { ...m, score1: parseInt(score1) || 0, score2: parseInt(score2) || 0 } : m
+    );
+    setMatches(updatedMatches);
   };
 
   const getTeamStats = (teamName) => {
-    let wins = 0, losses = 0, draws = 0, points = 0;
+    let wins = 0, draws = 0, losses = 0;
     matches.forEach(match => {
-      if (match.status === 'completed' && match.score1 !== null && match.score2 !== null) {
-        if (match.team1 === teamName) {
-          if (match.score1 > match.score2) { wins++; points += 3; }
-          else if (match.score1 < match.score2) { losses++; }
-          else { draws++; points += 1; }
-        } else if (match.team2 === teamName) {
-          if (match.score2 > match.score1) { wins++; points += 3; }
-          else if (match.score2 < match.score1) { losses++; }
-          else { draws++; points += 1; }
+      if ((match.team1 === teamName || match.team2 === teamName) && match.score1 !== undefined) {
+        if (match.score1 === match.score2) {
+          draws++;
+        } else if ((match.team1 === teamName && match.score1 > match.score2) || (match.team2 === teamName && match.score2 > match.score1)) {
+          wins++;
+        } else {
+          losses++;
         }
       }
     });
-    return { wins, losses, draws, points, totalMatches: wins + losses + draws };
+    return { wins, draws, losses };
   };
 
-  // Calculate prediction accuracy
-  const getPredictionStats = (playerName) => {
-    const playerPreds = allPredictions.filter(p => p.playerName === playerName);
+  const upcomingMatches = matches.filter(m => new Date(m.date) > new Date());
+  const completedMatches = matches.filter(m => new Date(m.date) <= new Date(Date.now() - 2 * 60 * 60 * 1000));
 
-    let correct = 0;
-    let total = playerPreds.length;
-
-    playerPreds.forEach(pred => {
-      const match = matches.find(m => m.id === pred.matchId);
-      if (match && match.status === 'completed' && match.score1 !== null && match.score2 !== null) {
-        const actualWinner = match.score1 > match.score2 ? 'team1' : match.score1 < match.score2 ? 'team2' : 'draw';
-        if (actualWinner === pred.prediction) {
-          correct++;
-        }
-      }
-    });
-
-    const accuracy = total === 0 ? 0 : Math.round((correct / total) * 100);
-    return { correct, total, accuracy };
+  const containerStyle = {
+    minHeight: '100vh',
+    background: colors.background,
+    fontFamily: "'Segoe UI', 'Roboto', '-apple-system', 'BlinkMacSystemFont', sans-serif",
+    color: colors.text
   };
 
-  // Build prediction leaderboard
-  const predictionLeaderboard = [...new Set(allPredictions.map(p => p.playerName))]
-    .map(name => ({
-      playerName: name,
-      ...getPredictionStats(name)
-    }))
-    .sort((a, b) => {
-      if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
-      return b.correct - a.correct;
-    });
+  const headerStyle = {
+    background: colors.primary,
+    color: 'white',
+    padding: '2rem',
+    textAlign: 'center',
+    boxShadow: `0 2px 8px rgba(0, 82, 204, 0.15)`
+  };
 
-  const leaderboard = teams
-    .map(team => ({ ...team, ...getTeamStats(team.team) }))
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      return b.wins - a.wins;
-    });
+  const navStyle = {
+    display: 'flex',
+    gap: '0.5rem',
+    padding: '1rem',
+    background: colors.surface,
+    borderBottom: `2px solid ${colors.border}`,
+    justifyContent: 'center',
+    flexWrap: 'wrap'
+  };
 
-  const filteredMatches = groupFilter === 'all'
-    ? matches
-    : matches.filter(m => m.group === groupFilter);
+  const tabButtonStyle = (isActive) => ({
+    padding: '0.75rem 1.5rem',
+    border: 'none',
+    background: isActive ? colors.primary : 'transparent',
+    color: isActive ? 'white' : colors.textSecondary,
+    cursor: 'pointer',
+    borderRadius: '6px',
+    fontWeight: 600,
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    borderBottom: isActive ? `3px solid ${colors.primary}` : 'none'
+  });
 
-  const sortedMatches = [...filteredMatches].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const upcomingMatches = sortedMatches.filter(m => m.status !== 'completed' && !hasMatchStarted(m.date));
-  const liveMatches = sortedMatches.filter(m => hasMatchStarted(m.date) && m.status !== 'completed');
-  const completedMatches = sortedMatches.filter(m => m.status === 'completed');
-  const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const contentStyle = {
+    maxWidth: '1000px',
+    margin: '0 auto',
+    padding: '2rem',
+  };
+
+  const cardStyle = {
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    padding: '1.5rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    marginBottom: '1rem'
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.75rem',
+    border: `1px solid ${colors.border}`,
+    borderRadius: '6px',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.2s ease',
+  };
+
+  const buttonStyle = (variant = 'primary') => {
+    const variants = {
+      primary: { background: colors.primary, color: 'white' },
+      success: { background: colors.success, color: 'white' },
+      danger: { background: colors.danger, color: 'white' },
+      warning: { background: colors.warning, color: colors.text }
+    };
+    
+    return {
+      padding: '0.75rem 1.5rem',
+      border: 'none',
+      background: variants[variant].background,
+      color: variants[variant].color,
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontWeight: 600,
+      fontSize: '14px',
+      transition: 'all 0.2s ease',
+    };
+  };
 
   return (
-    <div style={{ fontFamily: 'system-ui', color: '#333', minHeight: '100vh', background: 'linear-gradient(135deg, rgba(34,139,34,0.05) 0%, rgba(255,165,0,0.05) 100%)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #22a34a 0%, #228b22 50%, #1a6a1a 100%)', color: 'white', padding: '1.5rem', textAlign: 'center', borderBottom: '4px solid #ffa500' }}>
-        <h1 style={{ margin: '0 0 0.25rem', fontSize: '1.8rem', fontWeight: 500 }}>⚽ World Cup 2026</h1>
-        <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.85rem', opacity: 0.9 }}>Live Sweepstake + Predictions</p>
-        {playerName && <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.8 }}>👤 {playerName}</p>}
+    <div style={containerStyle}>
+      <div style={headerStyle}>
+        <h1 style={{ margin: '0 0 0.5rem', fontSize: '2.5rem', fontWeight: 700 }}>⚽ World Cup 2026</h1>
+        <p style={{ margin: 0, fontSize: '1rem', opacity: 0.95 }}>Workplace Sweepstake Leaderboard</p>
       </div>
 
-      <div style={{ display: 'flex', gap: '0', borderBottom: '2px solid #e0e0e0', background: '#f5f5f5', padding: '0 1rem', flexWrap: 'wrap', overflowX: 'auto' }}>
-        {[
-          { id: 'leaderboard', label: '🏆 Standings' },
-          { id: 'predictions', label: '🎯 Predictions' },
-          { id: 'matches', label: '⚽ Matches' },
-          { id: 'teams', label: '👥 Teams' },
-          { id: 'setup', label: '⚙️ Setup' }
-        ].map(nav => (
-          <button key={nav.id} onClick={() => setTab(nav.id)} style={{ padding: '1rem 1.5rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500, borderBottom: tab === nav.id ? '3px solid #ffa500' : 'none', color: tab === nav.id ? '#22a34a' : '#666', whiteSpace: 'nowrap' }}>
-            {nav.label}
+      <div style={navStyle}>
+        {['standings', 'matches', 'teams', 'predictions', 'setup'].map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={tabButtonStyle(tab === t)}
+          >
+            {t === 'standings' && '🏆 Standings'}
+            {t === 'matches' && '⚽ Matches'}
+            {t === 'teams' && '👥 Teams'}
+            {t === 'predictions' && '🎯 Predict'}
+            {t === 'setup' && '⚙️ Setup'}
           </button>
         ))}
       </div>
 
-      <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto' }}>
-        {/* TEAM LEADERBOARD */}
-        {tab === 'leaderboard' && (
+      <div style={contentStyle}>
+        {/* STANDINGS - PRIMARY */}
+        {tab === 'standings' && (
           <div>
-            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.3rem' }}>🏆 Team Standings</h2>
-            {leaderboard.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
-                <p style={{ fontSize: '2rem' }}>👥</p>
-                <p>Go to Setup to add teams</p>
+            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.8rem', fontWeight: 700 }}>🏆 Team Standings</h2>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+              <div style={{ ...cardStyle, textAlign: 'center' }}>
+                <p style={{ margin: 0, color: colors.textSecondary, fontSize: '13px', fontWeight: 500 }}>TOTAL TEAMS</p>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '2.5rem', fontWeight: 700, color: colors.primary }}>{hardcodedTeams.length}</p>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gap: '12px' }}>
-                {leaderboard.map((entry, idx) => (
-                  <div key={entry.id} style={{ background: 'white', border: idx === 0 ? '2px solid #ffa500' : '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto auto', gap: '0.75rem', alignItems: 'center', fontSize: '14px' }}>
-                    <div style={{ textAlign: 'center', fontWeight: 600, color: idx === 0 ? '#ffa500' : '#22a34a' }}>
-                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '1.8rem' }}>{entry.flag}</span>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>{entry.team}</p>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{entry.colleague}</p>
-                      </div>
-                    </div>
-                    <div style={{ background: '#22a34a', color: 'white', padding: '0.6rem 0.8rem', borderRadius: '6px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontSize: '0.7rem' }}>Pts</p>
-                      <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>{entry.points}</p>
-                    </div>
-                    <div style={{ background: '#f5f5f5', padding: '0.4rem 0.6rem', borderRadius: '6px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontWeight: 600, color: '#22a34a' }}>{entry.wins}</p>
-                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#999' }}>W</p>
-                    </div>
-                    <div style={{ background: '#f5f5f5', padding: '0.4rem 0.6rem', borderRadius: '6px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontWeight: 600, color: '#ffa500' }}>{entry.draws}</p>
-                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#999' }}>D</p>
-                    </div>
-                    <div style={{ background: '#f5f5f5', padding: '0.4rem 0.6rem', borderRadius: '6px', textAlign: 'center' }}>
-                      <p style={{ margin: 0, fontWeight: 600, color: '#d32f2f' }}>{entry.losses}</p>
-                      <p style={{ margin: 0, fontSize: '0.7rem', color: '#999' }}>L</p>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ ...cardStyle, textAlign: 'center' }}>
+                <p style={{ margin: 0, color: colors.textSecondary, fontSize: '13px', fontWeight: 500 }}>TOTAL MATCHES</p>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '2.5rem', fontWeight: 700, color: colors.success }}>{matches.length}</p>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* PREDICTION LEADERBOARD */}
-        {tab === 'predictions' && (
-          <div>
-            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.3rem' }}>🎯 Prediction Leaderboard</h2>
-            {predictionLeaderboard.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#999' }}>
-                <p style={{ fontSize: '2rem' }}>🎯</p>
-                <p>No predictions yet</p>
+              <div style={{ ...cardStyle, textAlign: 'center' }}>
+                <p style={{ margin: 0, color: colors.textSecondary, fontSize: '13px', fontWeight: 500 }}>COMPLETED</p>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '2.5rem', fontWeight: 700, color: colors.warning }}>{completedMatches.length}</p>
               </div>
-            ) : (
-              <>
-                <div style={{ background: '#e3f2fd', border: '1px solid #2196f3', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#1565c0', fontWeight: 500 }}>
-                    📊 Based on {matches.filter(m => m.status === 'completed').length} completed matches
-                  </p>
-                </div>
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {predictionLeaderboard.map((entry, idx) => (
-                    <div key={entry.playerName} style={{ background: 'white', border: idx === 0 ? '2px solid #ffa500' : '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', gap: '1rem', alignItems: 'center', fontSize: '14px' }}>
-                      <div style={{ textAlign: 'center', fontWeight: 600, color: idx === 0 ? '#ffa500' : '#22a34a' }}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>{entry.playerName}</p>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{entry.total} predictions</p>
-                      </div>
-                      <div style={{ background: '#e8f5e9', padding: '0.6rem 0.8rem', borderRadius: '6px', textAlign: 'center' }}>
-                        <p style={{ margin: 0, fontSize: '0.7rem', color: '#1b5e20' }}>Accuracy</p>
-                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 600, color: '#22a34a' }}>{entry.accuracy}%</p>
-                      </div>
-                      <div style={{ background: '#fff3cd', padding: '0.6rem 0.8rem', borderRadius: '6px', textAlign: 'center' }}>
-                        <p style={{ margin: 0, fontSize: '0.7rem', color: '#856404' }}>Correct</p>
-                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 600, color: '#ff6f00' }}>{entry.correct}/{entry.total}</p>
-                      </div>
-                      <div style={{ background: '#f3e5f5', padding: '0.6rem 0.8rem', borderRadius: '6px', textAlign: 'center' }}>
-                        <p style={{ margin: 0, fontSize: '0.7rem', color: '#4a148c' }}>Points</p>
-                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 600, color: '#7b1fa2' }}>{entry.correct * 3}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* MATCHES */}
-        {tab === 'matches' && (
-          <div>
-            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.3rem' }}>⚽ Matches</h2>
-
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <button onClick={() => setGroupFilter('all')} style={{ padding: '0.4rem 0.8rem', background: groupFilter === 'all' ? '#22a34a' : '#f5f5f5', color: groupFilter === 'all' ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
-                All
-              </button>
-              {groups.map(g => (
-                <button key={g} onClick={() => setGroupFilter(g)} style={{ padding: '0.4rem 0.8rem', background: groupFilter === g ? '#22a34a' : '#f5f5f5', color: groupFilter === g ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
-                  {g}
-                </button>
-              ))}
             </div>
 
-            {upcomingMatches.length > 0 && (
-              <>
-                <h3 style={{ marginBottom: '1rem', color: '#22a34a', fontWeight: 600 }}>⏳ Predictions Open</h3>
-                <div style={{ display: 'grid', gap: '10px', marginBottom: '2rem' }}>
-                  {upcomingMatches.map(match => (
-                    <div key={match.id} style={{ background: 'white', border: '2px solid #4caf50', borderRadius: '8px', padding: '1rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: '0 0 0.5rem', fontSize: '11px', color: '#999' }}>
-                            {match.group && `Group ${match.group} • `}{new Date(match.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontWeight: 600 }}>{match.team1}</span>
-                            <span style={{ color: '#999' }}>vs</span>
-                            <span style={{ fontWeight: 600 }}>{match.team2}</span>
-                          </div>
-                        </div>
-                        <button onClick={() => setShowPredictionForm(showPredictionForm === match.id ? null : match.id)} style={{ padding: '0.5rem 1rem', background: '#4caf50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                          {showPredictionForm === match.id ? '❌ Close' : '🎯 Predict'}
-                        </button>
-                      </div>
-
-                      {showPredictionForm === match.id && (
-                        <div style={{ background: '#f1f8e9', padding: '1rem', borderRadius: '6px', marginTop: '1rem' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                            <button onClick={() => submitPredictionToSheets(match.id, 'team1')} style={{ padding: '0.6rem', background: predictions[match.id] === 'team1' ? '#4caf50' : '#fff', color: predictions[match.id] === 'team1' ? 'white' : '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                              {match.team1}
-                            </button>
-                            <button onClick={() => submitPredictionToSheets(match.id, 'draw')} style={{ padding: '0.6rem', background: predictions[match.id] === 'draw' ? '#ffa500' : '#fff', color: predictions[match.id] === 'draw' ? 'white' : '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                              Draw
-                            </button>
-                            <button onClick={() => submitPredictionToSheets(match.id, 'team2')} style={{ padding: '0.6rem', background: predictions[match.id] === 'team2' ? '#4caf50' : '#fff', color: predictions[match.id] === 'team2' ? 'white' : '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                              {match.team2}
-                            </button>
-                          </div>
-                          {predictions[match.id] && <p style={{ margin: '0.75rem 0 0', fontSize: '11px', color: '#2e7d32', fontWeight: 600 }}>✅ Locked!</p>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {liveMatches.length > 0 && (
-              <>
-                <h3 style={{ marginBottom: '1rem', color: '#ff6f00', fontWeight: 600 }}>🔴 LIVE - Locked</h3>
-                <div style={{ display: 'grid', gap: '10px', marginBottom: '2rem' }}>
-                  {liveMatches.map(match => (
-                    <div key={match.id} style={{ background: '#fff3e0', border: '2px solid #ff9800', borderRadius: '8px', padding: '1rem' }}>
-                      <p style={{ margin: '0 0 0.5rem', fontSize: '11px', color: '#e65100', fontWeight: 600 }}>🔴 NO NEW PREDICTIONS</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ fontWeight: 600 }}>{match.team1}</span>
-                        <span style={{ color: '#ff9800' }}>vs</span>
-                        <span style={{ fontWeight: 600 }}>{match.team2}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {completedMatches.length > 0 && (
-              <>
-                <h3 style={{ marginBottom: '1rem', color: '#228b22', fontWeight: 600 }}>✅ Results</h3>
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  {completedMatches.map(match => (
-                    <div key={match.id} style={{ background: '#f1f8e9', border: '1px solid #c8e6c9', borderRadius: '8px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: 500 }}>{match.team1}</span>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#22a34a' }}>{match.score1} - {match.score2}</span>
-                          <span style={{ fontWeight: 500 }}>{match.team2}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input type="number" value={match.score1 ?? ''} onChange={(e) => updateMatchScore(match.id, e.target.value, match.score2)} style={{ width: '40px', padding: '5px', border: '1px solid #c8e6c9', borderRadius: '5px', textAlign: 'center', fontSize: '12px' }} />
-                        <span>-</span>
-                        <input type="number" value={match.score2 ?? ''} onChange={(e) => updateMatchScore(match.id, match.score1, e.target.value)} style={{ width: '40px', padding: '5px', border: '1px solid #c8e6c9', borderRadius: '5px', textAlign: 'center', fontSize: '12px' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* TEAMS */}
-        {tab === 'teams' && (
-          <div>
-            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.3rem' }}>👥 Team Pool</h2>
-            <div style={{ display: 'grid', gap: '10px' }}>
-              {teams.map(team => {
+            <h3 style={{ margin: '1.5rem 0 1rem', color: colors.primary, fontWeight: 700, fontSize: '1.2rem' }}>📊 Team Rankings</h3>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {hardcodedTeams.map((team, idx) => {
                 const stats = getTeamStats(team.team);
+                const totalPoints = stats.wins * 3 + stats.draws * 1;
                 return (
-                  <div key={team.id} style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '2rem' }}>{team.flag}</span>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>{team.team}</p>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{team.colleague}</p>
+                  <div key={team.id} style={{ ...cardStyle, background: idx === 0 ? colors.primaryLight : 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                        <div style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          borderRadius: '50%', 
+                          background: colors.primary, 
+                          color: 'white', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontWeight: 700,
+                          fontSize: '16px',
+                          flexShrink: 0
+                        }}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1.8rem' }}>{team.flag}</span>
+                            <div>
+                              <p style={{ margin: '0 0 0.25rem', fontWeight: 700, fontSize: '15px', color: colors.primary }}>{team.team}</p>
+                              <p style={{ margin: 0, fontSize: '12px', color: colors.textSecondary }}>Rep: {team.colleague}</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', gap: '6px', textAlign: 'center' }}>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600, color: '#22a34a' }}>{stats.wins}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#999' }}>W</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600, color: '#ffa500' }}>{stats.draws}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#999' }}>D</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600, color: '#d32f2f' }}>{stats.losses}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: '10px', color: '#999' }}>L</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto', gap: '1.5rem', textAlign: 'center' }}>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 700, color: colors.success, fontSize: '18px' }}>{stats.wins}</p>
+                          <p style={{ margin: '0.25rem 0 0', fontSize: '10px', color: colors.textSecondary, fontWeight: 600 }}>W</p>
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 700, color: colors.warning, fontSize: '18px' }}>{stats.draws}</p>
+                          <p style={{ margin: '0.25rem 0 0', fontSize: '10px', color: colors.textSecondary, fontWeight: 600 }}>D</p>
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 700, color: colors.danger, fontSize: '18px' }}>{stats.losses}</p>
+                          <p style={{ margin: '0.25rem 0 0', fontSize: '10px', color: colors.textSecondary, fontWeight: 600 }}>L</p>
+                        </div>
+                        <div style={{ background: colors.primaryLight, padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
+                          <p style={{ margin: 0, fontWeight: 700, color: colors.primary, fontSize: '18px' }}>{totalPoints}</p>
+                          <p style={{ margin: '0.25rem 0 0', fontSize: '10px', color: colors.textSecondary, fontWeight: 600 }}>PTS</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -521,39 +386,283 @@ export default function WorldCup2026Predictions() {
           </div>
         )}
 
+        {/* MATCHES */}
+        {tab === 'matches' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700 }}>⚽ Matches & Results</h2>
+              <button 
+                onClick={fetchWorldCupMatches}
+                style={{ ...buttonStyle('primary'), whiteSpace: 'nowrap' }}
+              >
+                🔄 Refresh Data
+              </button>
+            </div>
+
+            <div style={{ ...cardStyle, background: colors.successLight, border: `2px solid ${colors.success}`, marginBottom: '2rem' }}>
+              <p style={{ margin: 0, color: colors.success, fontWeight: 600, fontSize: '13px' }}>✅ Live Data from FIFA World Cup API</p>
+              <p style={{ margin: '0.5rem 0 0', color: colors.textSecondary, fontSize: '12px' }}>Auto-updates every 60 seconds • Last updated: {new Date().toLocaleTimeString()}</p>
+            </div>
+            
+            {matches.length === 0 ? (
+              <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', background: colors.warningLight, border: `2px dashed ${colors.warning}` }}>
+                <p style={{ margin: 0, color: colors.text, fontWeight: 600, fontSize: '16px' }}>Loading match data...</p>
+                <p style={{ margin: '0.5rem 0 0', color: colors.textSecondary, fontSize: '14px' }}>Fetching latest matches from FIFA World Cup API</p>
+              </div>
+            ) : (
+              <>
+                {upcomingMatches.length > 0 && (
+                  <>
+                    <h3 style={{ margin: '0 0 1rem', color: colors.primary, fontWeight: 600, fontSize: '1.1rem' }}>⏳ Upcoming Matches ({upcomingMatches.length})</h3>
+                    <div style={{ display: 'grid', gap: '12px', marginBottom: '2rem' }}>
+                      {upcomingMatches.map(match => (
+                        <div key={match.id} style={{ ...cardStyle }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 600, color: colors.textSecondary, background: colors.primaryLight, padding: '0.25rem 0.75rem', borderRadius: '20px' }}>Group {match.group}</span>
+                              </div>
+                              <p style={{ margin: '0 0 0.5rem', fontWeight: 700, fontSize: '16px' }}>{match.team1} vs {match.team2}</p>
+                              <p style={{ margin: 0, fontSize: '13px', color: colors.textSecondary }}>
+                                📅 {new Date(match.date).toLocaleDateString()} at {new Date(match.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            <button 
+                              onClick={() => setTab('predictions')} 
+                              style={{ ...buttonStyle('primary'), whiteSpace: 'nowrap' }}
+                            >
+                              🎯 Predict
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {completedMatches.length > 0 && (
+                  <>
+                    <h3 style={{ margin: '0 0 1rem', color: colors.success, fontWeight: 600, fontSize: '1.1rem' }}>✅ Final Results ({completedMatches.length})</h3>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {completedMatches.map(match => (
+                        <div key={match.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderLeft: `4px solid ${colors.success}` }}>
+                          <div style={{ flex: 1, minWidth: '200px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: colors.textSecondary, background: colors.successLight, padding: '0.25rem 0.75rem', borderRadius: '20px' }}>Group {match.group}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <span style={{ fontWeight: 600 }}>{match.team1}</span>
+                              <span style={{ fontSize: '1.3rem', fontWeight: 700, color: colors.success }}>{match.score1 ?? '-'} - {match.score2 ?? '-'}</span>
+                              <span style={{ fontWeight: 600 }}>{match.team2}</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input 
+                              type="number" 
+                              value={match.score1 ?? ''} 
+                              onChange={(e) => updateMatchScore(match.id, e.target.value, match.score2)} 
+                              style={{ ...inputStyle, width: '50px', textAlign: 'center' }} 
+                            />
+                            <span style={{ fontWeight: 600 }}>-</span>
+                            <input 
+                              type="number" 
+                              value={match.score2 ?? ''} 
+                              onChange={(e) => updateMatchScore(match.id, match.score1, e.target.value)} 
+                              style={{ ...inputStyle, width: '50px', textAlign: 'center' }} 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TEAMS */}
+        {tab === 'teams' && (
+          <div>
+            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.8rem', fontWeight: 700 }}>👥 Team Pool</h2>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {hardcodedTeams.map(team => {
+                const stats = getTeamStats(team.team);
+                return (
+                  <div key={team.id} style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                      <span style={{ fontSize: '2.5rem' }}>{team.flag}</span>
+                      <div>
+                        <p style={{ margin: '0 0 0.25rem', fontWeight: 700, fontSize: '16px', color: colors.primary }}>{team.team}</p>
+                        <p style={{ margin: 0, fontSize: '13px', color: colors.textSecondary }}>Rep: {team.colleague}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto auto auto', gap: '1.5rem', textAlign: 'center' }}>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 700, color: colors.success, fontSize: '18px' }}>{stats.wins}</p>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '11px', color: colors.textSecondary, fontWeight: 600 }}>WINS</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 700, color: colors.warning, fontSize: '18px' }}>{stats.draws}</p>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '11px', color: colors.textSecondary, fontWeight: 600 }}>DRAWS</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 700, color: colors.danger, fontSize: '18px' }}>{stats.losses}</p>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '11px', color: colors.textSecondary, fontWeight: 600 }}>LOSSES</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PREDICTIONS - SECONDARY */}
+        {tab === 'predictions' && (
+          <div>
+            <div style={{ background: colors.primaryLight, border: `2px solid ${colors.primary}`, borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+              <p style={{ margin: 0, color: colors.primary, fontWeight: 600, fontSize: '13px' }}>💡 Quick Predictions</p>
+              <p style={{ margin: '0.5rem 0 0', color: colors.textSecondary, fontSize: '13px' }}>Make your match predictions below. Predictions lock when a match starts!</p>
+            </div>
+
+            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.8rem', fontWeight: 700 }}>🎯 Make Your Predictions</h2>
+            {matches.length === 0 ? (
+              <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', background: colors.warningLight, border: `2px dashed ${colors.warning}` }}>
+                <p style={{ margin: 0, color: colors.text, fontWeight: 600, fontSize: '16px' }}>No matches available</p>
+                <p style={{ margin: '0.5rem 0 0', color: colors.textSecondary, fontSize: '14px' }}>Check back soon for upcoming matches!</p>
+              </div>
+            ) : (
+              <>
+                {upcomingMatches.filter(m => !predictions[m.id]).length > 0 && (
+                  <>
+                    <h3 style={{ margin: '0 0 1rem', color: colors.primary, fontWeight: 600, fontSize: '1.1rem' }}>⏳ Available for Prediction</h3>
+                    <div style={{ display: 'grid', gap: '12px', marginBottom: '2rem' }}>
+                      {upcomingMatches.filter(m => !predictions[m.id]).map(match => (
+                        <div key={match.id} style={{ ...cardStyle }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                            <div>
+                              <p style={{ margin: '0 0 0.5rem', fontWeight: 700, fontSize: '16px' }}>{match.team1} vs {match.team2}</p>
+                              <p style={{ margin: 0, fontSize: '12px', color: colors.textSecondary }}>
+                                📅 {new Date(match.date).toLocaleDateString()} at {new Date(match.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setShowPredictionForm(showPredictionForm === match.id ? null : match.id)} 
+                            style={{ ...buttonStyle('primary'), width: '100%' }}
+                          >
+                            {showPredictionForm === match.id ? '❌ Close' : '🎯 Make Prediction'}
+                          </button>
+
+                          {showPredictionForm === match.id && (
+                            <div style={{ background: colors.primaryLight, padding: '1rem', borderRadius: '6px', marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                              <button 
+                                onClick={() => submitPredictionToSheets(match.id, 'team1')} 
+                                style={{
+                                  ...buttonStyle(predictions[match.id] === 'team1' ? 'success' : 'primary'),
+                                  padding: '0.75rem',
+                                  fontSize: '13px',
+                                  opacity: predictions[match.id] === 'team1' ? 1 : 0.7
+                                }}
+                              >
+                                {match.team1}
+                              </button>
+                              <button 
+                                onClick={() => submitPredictionToSheets(match.id, 'draw')} 
+                                style={{
+                                  ...buttonStyle(predictions[match.id] === 'draw' ? 'warning' : 'primary'),
+                                  padding: '0.75rem',
+                                  fontSize: '13px',
+                                  opacity: predictions[match.id] === 'draw' ? 1 : 0.7
+                                }}
+                              >
+                                Draw
+                              </button>
+                              <button 
+                                onClick={() => submitPredictionToSheets(match.id, 'team2')} 
+                                style={{
+                                  ...buttonStyle(predictions[match.id] === 'team2' ? 'success' : 'primary'),
+                                  padding: '0.75rem',
+                                  fontSize: '13px',
+                                  opacity: predictions[match.id] === 'team2' ? 1 : 0.7
+                                }}
+                              >
+                                {match.team2}
+                              </button>
+                            </div>
+                          )}
+                          {predictions[match.id] && <p style={{ margin: '0.75rem 0 0', fontSize: '13px', color: colors.success, fontWeight: 600 }}>✅ Prediction locked!</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {matches.filter(m => new Date(m.date) <= new Date() && predictions[m.id]).length > 0 && (
+                  <>
+                    <h3 style={{ margin: '0 0 1rem', color: colors.danger, fontWeight: 600, fontSize: '1.1rem' }}>🔴 Match Started - Locked</h3>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {matches.filter(m => new Date(m.date) <= new Date() && predictions[m.id]).map(match => (
+                        <div key={match.id} style={{ ...cardStyle, borderLeft: `4px solid ${colors.danger}` }}>
+                          <p style={{ margin: '0 0 0.5rem', fontSize: '12px', color: colors.danger, fontWeight: 600 }}>🔴 PREDICTION LOCKED</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <span style={{ fontWeight: 600 }}>{match.team1}</span>
+                            <span style={{ color: colors.danger, fontWeight: 600 }}>vs</span>
+                            <span style={{ fontWeight: 600 }}>{match.team2}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* SETUP */}
         {tab === 'setup' && (
           <div>
-            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.3rem' }}>⚙️ Setup</h2>
+            <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.8rem', fontWeight: 700 }}>⚙️ Setup</h2>
 
-            <div style={{ background: '#e3f2fd', border: '1px solid #2196f3', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
-              <p style={{ margin: '0 0 0.5rem', fontWeight: 600, color: '#1565c0', fontSize: '13px' }}>👤 Your Prediction Username</p>
-              <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Enter your name" style={{ width: '100%', padding: '0.6rem', border: '1px solid #2196f3', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+            <div style={{ ...cardStyle, background: colors.primaryLight, border: `2px solid ${colors.primary}`, marginBottom: '2rem' }}>
+              <p style={{ margin: '0 0 1rem', fontWeight: 700, color: colors.primary, fontSize: '14px' }}>👤 Your Prediction Username</p>
+              <input 
+                type="text" 
+                value={playerName} 
+                onChange={(e) => setPlayerName(e.target.value)} 
+                placeholder="Enter your name"
+                style={{ ...inputStyle }}
+              />
+              <p style={{ margin: '0.75rem 0 0', fontSize: '12px', color: colors.textSecondary }}>This name will appear when you make predictions.</p>
             </div>
 
-            <h3 style={{ margin: '1rem 0 1rem', fontSize: '1rem', fontWeight: 500 }}>Add Team</h3>
-            {!showAddTeam ? (
-              <button onClick={() => setShowAddTeam(true)} style={{ padding: '0.5rem 1rem', background: '#22a34a', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 500, fontSize: '13px', marginBottom: '1.5rem' }}>
-                + Add Team
-              </button>
-            ) : (
-              <div style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #e0e0e0' }}>
-                <input type="text" placeholder="Team" value={newTeamForm.team} onChange={(e) => setNewTeamForm({ ...newTeamForm, team: e.target.value })} list="teams-list" style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '5px', fontSize: '13px', marginBottom: '10px', boxSizing: 'border-box' }} />
-                <datalist id="teams-list">
-                  {wcTeams.map(t => <option key={t.name} value={t.name} />)}
-                </datalist>
-                <input type="text" placeholder="Colleague" value={newTeamForm.colleague} onChange={(e) => setNewTeamForm({ ...newTeamForm, colleague: e.target.value })} style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '5px', fontSize: '13px', marginBottom: '10px', boxSizing: 'border-box' }} />
-                <button onClick={addTeam} style={{ padding: '8px 16px', background: '#22a34a', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', width: '100%', fontWeight: 500, fontSize: '13px' }}>
-                  Save
-                </button>
+            <div style={{ ...cardStyle, background: colors.successLight, border: `2px solid ${colors.success}`, marginBottom: '2rem' }}>
+              <p style={{ margin: '0 0 1rem', fontWeight: 700, color: colors.success, fontSize: '14px' }}>✅ Teams & Colleagues (Fixed)</p>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {hardcodedTeams.map((team, idx) => (
+                  <div key={idx} style={{ background: 'white', padding: '0.75rem', borderRadius: '6px', border: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '1.2rem', marginRight: '0.5rem' }}>{team.flag}</span>
+                      <span style={{ fontWeight: 600 }}>{team.team}</span>
+                    </div>
+                    <span style={{ fontSize: '13px', color: colors.textSecondary }}>{team.colleague}</span>
+                  </div>
+                ))}
               </div>
-            )}
+              <p style={{ margin: '1rem 0 0', fontSize: '12px', color: colors.success }}>📌 Teams are managed by administrators.</p>
+            </div>
 
-            <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '1rem', fontSize: '12px' }}>
-              <p style={{ margin: 0, fontWeight: 600, color: '#856404' }}>📊 System Status</p>
-              <p style={{ margin: '0.3rem 0', color: '#856404' }}>✅ Predictions: Active</p>
-              <p style={{ margin: '0.3rem 0', color: '#856404' }}>✅ Auto-lock: When match starts</p>
-              <p style={{ margin: '0.3rem 0', color: '#856404' }}>✅ Leaderboard: Real-time</p>
+            <div style={{ ...cardStyle, background: colors.warningLight, border: `2px solid ${colors.warning}` }}>
+              <p style={{ margin: '0 0 1rem', fontWeight: 700, color: colors.text, fontSize: '14px' }}>📊 System Status & Data Sources</p>
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: colors.text }}>✅ Leaderboard: Live & Updated</p>
+                <p style={{ margin: 0, fontSize: '13px', color: colors.text }}>✅ Match Updates: <strong>FIFA World Cup API</strong> (Real-time)</p>
+                <p style={{ margin: 0, fontSize: '13px', color: colors.text }}>✅ Predictions: Active</p>
+                <p style={{ margin: 0, fontSize: '13px', color: colors.text }}>✅ Auto-lock: When match starts</p>
+                <p style={{ margin: '0.75rem 0 0', fontSize: '12px', color: colors.textSecondary, fontStyle: 'italic' }}>🔄 Match data auto-refreshes every 60 seconds</p>
+              </div>
             </div>
           </div>
         )}
